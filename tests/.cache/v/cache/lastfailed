@@ -1,0 +1,8 @@
+{
+  "test_erc20coin.py::test_create": true,
+  "test_erc20coin.py::test_invalid_transfer": true,
+  "test_erc20coin.py::test_mint_coins": true,
+  "test_erc20coin.py::test_only_owner_can_mint_coins": true,
+  "test_erc20coin.py::test_valid_transfer": true,
+  "test_erc20coin.py::test_zero_transfer": true
+}
