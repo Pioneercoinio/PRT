@@ -7,11 +7,8 @@ if [ ! -d "venv" ]; then
   INIT=true
 fi
 
-source ~/.profile
 source venv/bin/activate
 
 if $INIT; then
     pip install -r requirements.txt
 fi
-
-/bin/bash
