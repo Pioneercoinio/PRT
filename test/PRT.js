@@ -1,36 +1,46 @@
+/* globals artifacts */
+
+import { toBN } from "web3-utils";
+
 const PRT = artifacts.require("PRT");
 
 const NAME = "Pioneer Reputation Token";
 const SYMBOL = "PRT";
 const DECIMALS = 18;
 const INITIAL_SUPPLY = 230000;
-const TOTAL_SUPPLY_MCOIN = INITIAL_SUPPLY * 10 ** DECIMALS;
+const TOTAL_SUPPLY_MCOIN = toBN(INITIAL_SUPPLY).mul(toBN(10 ** DECIMALS));
 
 async function validateContractState(contract, { name, symbol, decimals, totalSupply, balances, allowed }) {
-  const _name = await contract.name.call();
-  assert.equal(_name, name === undefined ? NAME : name);
-  const _symbol = await contract.symbol.call();
-  assert.equal(_symbol, symbol === undefined ? SYMBOL : symbol);
-  const _decimals = await contract.decimals.call();
-  assert.equal(_decimals, decimals === undefined ? DECIMALS : decimals);
-  const _totalSupply = await contract.totalSupply.call();
-  assert.equal(_totalSupply, totalSupply === undefined ? TOTAL_SUPPLY_MCOIN : totalSupply);
-  balances = balances === undefined ? [] : balances;
+  const actualName = await contract.name.call();
+  assert.equal(actualName, name === undefined ? NAME : name);
+  const actualSymbol = await contract.symbol.call();
+  assert.equal(actualSymbol, symbol === undefined ? SYMBOL : symbol);
+  const actualDecimals = await contract.decimals.call();
+  assert.equal(actualDecimals, decimals === undefined ? DECIMALS : decimals);
+  const actualTotalSupply = await contract.totalSupply.call();
+  const expectedSupply = totalSupply === undefined ? TOTAL_SUPPLY_MCOIN : totalSupply;
+  assert.equal(toBN(actualTotalSupply).toString(), expectedSupply.toString());
+  const expectedBalances = balances === undefined ? [] : balances;
   let address;
   let value;
-  for ({ address, value } of balances) {
-    const _value = await contract.balanceOf(address);
-    assert.equal(_value, value);
+  // eslint-disable-next-line no-restricted-syntax
+  for ({ address, value } of expectedBalances) {
+    // eslint-disable-next-line no-await-in-loop
+    const actualValue = await contract.balanceOf(address);
+    assert.equal(toBN(actualValue).toString(), value.toString());
   }
-  allowed = allowed === undefined ? [] : allowed;
+  const expectedAllowed = allowed === undefined ? [] : allowed;
   let owner;
   let allowances;
-  for ({ owner, allowances } of allowed) {
+  // eslint-disable-next-line no-restricted-syntax
+  for ({ owner, allowances } of expectedAllowed) {
     let spender;
     let ammount;
+    // eslint-disable-next-line no-restricted-syntax
     for ({ spender, ammount } of allowances) {
-      const _ammount = await contract.allowance(owner, spender);
-      assert.equal(_ammount, ammount);
+      // eslint-disable-next-line no-await-in-loop
+      const actualAmmount = await contract.allowance(owner, spender);
+      assert.equal(toBN(actualAmmount).toString(), ammount.toString());
     }
   }
 }
@@ -40,13 +50,17 @@ function getEvents(result, eventName) {
   return logs === undefined ? [] : logs.filter(e => e.event === eventName);
 }
 
-function validateEvents(events, expected) {
-  expected = expected === undefined ? [] : expected;
+function softEqual(actual, expected) {
+  assert.equal(typeof actual, typeof expected);
+}
+
+function validateEvents(events, pExpected) {
+  const expected = pExpected === undefined ? [] : pExpected;
   assert.equal(events.length, expected.length);
   expected.forEach((target, index) => {
     const event = events[index];
     Object.keys(target).forEach(key => {
-      assert.deepEqual(event[key], target[key]);
+      softEqual(event[key], target[key]);
     });
   });
 }
@@ -79,17 +93,17 @@ contract("PRT", addresses => {
       });
     });
     it("valid_transfer", async () => {
-      const otherAccount = web3.eth.accounts[1];
-      const transactionAmmount = 1000;
+      const otherAccount = addresses[1];
+      const transactionAmmount = toBN(1000);
 
-      const result = await prt.transfer(otherAccount, transactionAmmount);
+      const result = await prt.transfer(otherAccount, transactionAmmount.toString());
 
       assert.equal(result.receipt.gasUsed, 51063);
       await validateContractState(prt, {
         balances: [
           {
             address: web3.eth.coinbase,
-            value: TOTAL_SUPPLY_MCOIN - transactionAmmount
+            value: TOTAL_SUPPLY_MCOIN.sub(transactionAmmount)
           },
           { address: otherAccount, value: transactionAmmount }
         ]
@@ -101,27 +115,23 @@ contract("PRT", addresses => {
           args: {
             from: web3.eth.coinbase,
             to: otherAccount,
-            value: {
-              c: [transactionAmmount],
-              e: 3,
-              s: 1
-            }
+            value: transactionAmmount
           }
         }
       ]);
     });
     it("test_zero_transfer", async () => {
-      const otherAccount = web3.eth.accounts[1];
-      const transactionAmmount = 0;
+      const otherAccount = addresses[1];
+      const transactionAmmount = toBN(0);
 
-      const result = await prt.transfer(otherAccount, transactionAmmount);
+      const result = await prt.transfer(otherAccount, transactionAmmount.toString());
 
       assert.equal(result.receipt.gasUsed, 35935);
       await validateContractState(prt, {
         balances: [
           {
             address: web3.eth.coinbase,
-            value: TOTAL_SUPPLY_MCOIN - transactionAmmount
+            value: TOTAL_SUPPLY_MCOIN.sub(transactionAmmount)
           },
           { address: otherAccount, value: transactionAmmount }
         ]
@@ -133,34 +143,27 @@ contract("PRT", addresses => {
           args: {
             from: web3.eth.coinbase,
             to: otherAccount,
-            value: {
-              c: [transactionAmmount],
-              e: 0,
-              s: 1
-            }
+            value: transactionAmmount
           }
         }
       ]);
     });
     it("test_invalid_transfer", async () => {
-      const otherAccount = web3.eth.accounts[1];
-      const transactionAmmount = TOTAL_SUPPLY_MCOIN + TOTAL_SUPPLY_MCOIN;
+      const otherAccount = addresses[1];
+      const transactionAmmount = TOTAL_SUPPLY_MCOIN + 1;
 
-      const result = await checkError(prt.transfer(otherAccount, transactionAmmount));
+      const result = await checkError(prt.transfer(otherAccount, transactionAmmount.toString()));
 
       await validateContractState(prt, {
-        balances: [
-          { address: web3.eth.coinbase, value: TOTAL_SUPPLY_MCOIN - transactionAmmount },
-          { address: otherAccount, value: 0 }
-        ]
+        balances: [{ address: web3.eth.coinbase, value: TOTAL_SUPPLY_MCOIN }, { address: otherAccount, value: 0 }]
       });
 
       validateEvents(getEvents(result, "Transfer"));
     });
     it("test_approve", async () => {
-      const otherAccount = web3.eth.accounts[1];
-      const ammount = 10;
-      const result = await prt.approve(otherAccount, ammount);
+      const otherAccount = addresses[1];
+      const ammount = toBN(10);
+      const result = await prt.approve(otherAccount, ammount.toString());
 
       assert.equal(result.receipt.gasUsed, 45698);
       await validateContractState(prt, {
@@ -184,13 +187,33 @@ contract("PRT", addresses => {
       ]);
     });
     it("test_approve_non_zero", async () => {
-      const otherAccount = web3.eth.accounts[1];
-      const ammount = 10;
-      let result = await prt.approve(otherAccount, ammount);
+      const otherAccount = addresses[1];
+      const ammount = toBN(10);
+      let result = await prt.approve(otherAccount, ammount.toString());
 
-      result = await checkError(prt.approve(otherAccount, ammount));
+      result = await checkError(prt.approve(otherAccount, ammount.toString()));
 
       await validateContractState(prt, {
+        allowed: [
+          {
+            owner: web3.eth.coinbase,
+            allowances: [{ spender: otherAccount, ammount }]
+          }
+        ]
+      });
+
+      validateEvents(getEvents(result, "Approval"));
+    });
+    it("test_approve_zero_first", async () => {
+      const otherAccount = addresses[1];
+      const ammount = toBN(10);
+      let result = await prt.approve(otherAccount, ammount.toString());
+
+      result = await prt.approve(otherAccount, 0);
+
+      result = await prt.approve(otherAccount, ammount.toString());
+
+      validateContractState(prt, {
         allowed: [
           {
             owner: web3.eth.coinbase,
@@ -209,6 +232,12 @@ contract("PRT", addresses => {
           }
         }
       ]);
+    });
+    it("test_transferFrom_not_allowed", async () => {
+      const otherAccount = addresses[1];
+      const destAccount = addresses[2];
+      const ammount = 10;
+      await checkError(prt.transferFrom(otherAccount, destAccount, ammount));
     });
   });
 });

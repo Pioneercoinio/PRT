@@ -2,31 +2,24 @@
 
 This repo contains the definition of the PRT Ethereum smart contract.
 
-Including [tests](tests) to validate that the contract works as expected.
+Including [tests](test) to validate that the contract works as expected.
 
 It implements is a [ERC20](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md) token
 
 ## Running locally
 
-To build the contract and run the tests on Mac OS:
+To build the contract and run the tests:
 
 First install dependencies and set up the python virtualenv environment by running:
 
 ```
-bootstrap.sh
-```
-
-Load the virtual environment with:
-
-```
-source activate_venv.sh
+yarn install
 ```
 
 Compile the contract and run the test with:
 
 ```
-populus compile
-py.test tests
+npm run test
 ```
 
 ## Deploying the contract
