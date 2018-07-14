@@ -1,23 +1,21 @@
 /* globals artifacts */
 
 import { toBN } from "web3-utils";
-import { defaultValidateContractSate, getEvents, validateEvents, checkError } from "./test_helpers.js";
+import { defaultValidateContractSate, getEvents, validateEvents, checkError } from "./test_helpers";
 
 const PRT = artifacts.require("PRT");
 
-const NAME = "Pioneer Reputation Token";
-const SYMBOL = "PRT";
 const DECIMALS = 18;
 const INITIAL_SUPPLY = 230000;
 const TOTAL_SUPPLY_MCOIN = toBN(INITIAL_SUPPLY).mul(toBN(10 ** DECIMALS));
 
 const validateContractState = defaultValidateContractSate({
-  name: NAME,
-  symbol: SYMBOL,
+  name: "Pioneer Reputation Token",
+  symbol: "PRT",
   decimals: DECIMALS,
-  totalSupply: TOTAL_SUPPLY_MCOIN
-})
-
+  totalSupply: TOTAL_SUPPLY_MCOIN,
+  colony: 0
+});
 
 contract("PRT", addresses => {
   let prt;
@@ -38,7 +36,7 @@ contract("PRT", addresses => {
 
       const result = await prt.transfer(otherAccount, transactionAmmount.toString());
 
-      assert.equal(result.receipt.gasUsed, 51107);
+      assert.equal(result.receipt.gasUsed, 51129);
       await validateContractState(prt, {
         balances: [
           {
@@ -66,7 +64,7 @@ contract("PRT", addresses => {
 
       const result = await prt.transfer(otherAccount, transactionAmmount.toString());
 
-      assert.equal(result.receipt.gasUsed, 35979);
+      assert.equal(result.receipt.gasUsed, 36001);
       await validateContractState(prt, {
         balances: [
           {
@@ -182,14 +180,15 @@ contract("PRT", addresses => {
     it("test_registerColony", async () => {
       const otherAccount = addresses[1];
 
-      let result = await prt.registerColony(otherAccount);
+      const result = await prt.registerColony(otherAccount);
 
       assert.equal(result.receipt.gasUsed, 71941);
 
-      const colony_supply = TOTAL_SUPPLY_MCOIN.divn(2);
+      const colonySupply = TOTAL_SUPPLY_MCOIN.divn(2);
 
       await validateContractState(prt, {
-        balances: [{ address: web3.eth.coinbase, value: colony_supply }, { address: otherAccount, value: colony_supply }]
+        colony: otherAccount,
+        balances: [{ address: web3.eth.coinbase, value: colonySupply }, { address: otherAccount, value: colonySupply }]
       });
 
       validateEvents(getEvents(result, "Transfer"), [
@@ -198,11 +197,10 @@ contract("PRT", addresses => {
           args: {
             from: web3.eth.coinbase,
             to: otherAccount,
-            value: colony_supply
+            value: colonySupply
           }
         }
       ]);
-
     });
     it("test_registerColony_only_once", async () => {
       const otherAccount = addresses[1];
@@ -211,14 +209,13 @@ contract("PRT", addresses => {
 
       result = await checkError(prt.registerColony(otherAccount));
       validateEvents(getEvents(result, "Transfer"));
-
     });
     it("test_registerColony_only_owner", async () => {
       const otherAccount = addresses[1];
 
       await prt.transferOwnership(otherAccount);
 
-      let result = await checkError(prt.registerColony(otherAccount));
+      const result = await checkError(prt.registerColony(otherAccount));
 
       assert.equal(result.receipt.gasUsed, 23442);
 
@@ -227,7 +224,6 @@ contract("PRT", addresses => {
       });
 
       validateEvents(getEvents(result, "Transfer"));
-
     });
   });
 });

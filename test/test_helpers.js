@@ -1,16 +1,20 @@
-import { toBN } from "web3-utils";
+import { toBN, isBN } from "web3-utils";
 
-export function defaultValidateContractSate(defaults){
-  return async (contract, { name, symbol, decimals, totalSupply, balances, allowed }) => {
-    const actualName = await contract.name.call();
-    assert.equal(actualName, name === undefined ? defaults.name : name);
-    const actualSymbol = await contract.symbol.call();
-    assert.equal(actualSymbol, symbol === undefined ? defaults.symbol : symbol);
-    const actualDecimals = await contract.decimals.call();
-    assert.equal(actualDecimals, decimals === undefined ? defaults.decimals : decimals);
-    const actualTotalSupply = await contract.totalSupply.call();
-    const expectedSupply = totalSupply === undefined ? defaults.totalSupply : totalSupply;
-    assert.equal(toBN(actualTotalSupply).toString(), expectedSupply.toString());
+export function defaultValidateContractSate(defaults) {
+  return async (contract, { balances, allowed, ...remainingState }) => {
+    const expected = { ...defaults, ...remainingState };
+    let attribute;
+    // eslint-disable-next-line no-restricted-syntax
+    for (attribute of Object.keys(expected)) {
+      // eslint-disable-next-line no-await-in-loop
+      let value = await contract[attribute].call();
+      let expectedValue = expected[attribute];
+      if (isBN(expectedValue)) {
+        value = toBN(value).toString();
+        expectedValue = expectedValue.toString();
+      }
+      assert.equal(value, expectedValue);
+    }
     const expectedBalances = balances === undefined ? [] : balances;
     let address;
     let value;
@@ -34,7 +38,7 @@ export function defaultValidateContractSate(defaults){
         assert.equal(toBN(actualAmmount).toString(), ammount.toString());
       }
     }
-  }
+  };
 }
 
 export function getEvents(result, eventName) {
@@ -67,7 +71,5 @@ export async function checkError(promise) {
   }
   // Check the receipt `status` to ensure transaction failed.
   assert.equal(result.receipt.status, 0x00);
-
   return result;
 }
-

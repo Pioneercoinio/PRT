@@ -1,7 +1,6 @@
 /* globals artifacts */
 
-import { toBN } from "web3-utils";
-import { getEvents, validateEvents, checkError } from "./test_helpers.js";
+import { getEvents, validateEvents, checkError } from "./test_helpers";
 
 const Owned = artifacts.require("Owned");
 
@@ -42,7 +41,6 @@ contract("Owned", addresses => {
       const result = await checkError(owned.transferOwnership(web3.eth.coinbase));
 
       validateEvents(getEvents(result, "OwnershipTransferred"));
-
     });
   });
 });

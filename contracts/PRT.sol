@@ -1,10 +1,12 @@
 pragma solidity ^0.4.24;
 
-/// @title General PRT.
-/// @author frods
-
 import "./Owned.sol";
 
+
+/**
+ * @title General PRT.
+ * @dev The token for the pioneer colony and pionercoin
+ */
 contract PRT is Owned {
   string public name = "Pioneer Reputation Token";
   string public symbol = "PRT";
@@ -14,7 +16,7 @@ contract PRT is Owned {
   mapping (address => uint256) private balances;
   mapping (address => mapping (address => uint256)) private allowed;
 
-  address private colony;
+  address public colony;
 
   // This generates a public event on the blockchain that will notify clients
   event Transfer(address indexed from, address indexed to, uint256 value);
