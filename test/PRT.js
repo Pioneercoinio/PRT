@@ -1,83 +1,21 @@
 /* globals artifacts */
 
 import { toBN } from "web3-utils";
+import { defaultValidateContractSate, getEvents, validateEvents, checkError } from "./test_helpers";
 
 const PRT = artifacts.require("PRT");
 
-const NAME = "Pioneer Reputation Token";
-const SYMBOL = "PRT";
 const DECIMALS = 18;
 const INITIAL_SUPPLY = 230000;
 const TOTAL_SUPPLY_MCOIN = toBN(INITIAL_SUPPLY).mul(toBN(10 ** DECIMALS));
 
-async function validateContractState(contract, { name, symbol, decimals, totalSupply, balances, allowed }) {
-  const actualName = await contract.name.call();
-  assert.equal(actualName, name === undefined ? NAME : name);
-  const actualSymbol = await contract.symbol.call();
-  assert.equal(actualSymbol, symbol === undefined ? SYMBOL : symbol);
-  const actualDecimals = await contract.decimals.call();
-  assert.equal(actualDecimals, decimals === undefined ? DECIMALS : decimals);
-  const actualTotalSupply = await contract.totalSupply.call();
-  const expectedSupply = totalSupply === undefined ? TOTAL_SUPPLY_MCOIN : totalSupply;
-  assert.equal(toBN(actualTotalSupply).toString(), expectedSupply.toString());
-  const expectedBalances = balances === undefined ? [] : balances;
-  let address;
-  let value;
-  // eslint-disable-next-line no-restricted-syntax
-  for ({ address, value } of expectedBalances) {
-    // eslint-disable-next-line no-await-in-loop
-    const actualValue = await contract.balanceOf(address);
-    assert.equal(toBN(actualValue).toString(), value.toString());
-  }
-  const expectedAllowed = allowed === undefined ? [] : allowed;
-  let owner;
-  let allowances;
-  // eslint-disable-next-line no-restricted-syntax
-  for ({ owner, allowances } of expectedAllowed) {
-    let spender;
-    let ammount;
-    // eslint-disable-next-line no-restricted-syntax
-    for ({ spender, ammount } of allowances) {
-      // eslint-disable-next-line no-await-in-loop
-      const actualAmmount = await contract.allowance(owner, spender);
-      assert.equal(toBN(actualAmmount).toString(), ammount.toString());
-    }
-  }
-}
-
-function getEvents(result, eventName) {
-  const { logs } = result;
-  return logs === undefined ? [] : logs.filter(e => e.event === eventName);
-}
-
-function softEqual(actual, expected) {
-  assert.equal(typeof actual, typeof expected);
-}
-
-function validateEvents(events, pExpected) {
-  const expected = pExpected === undefined ? [] : pExpected;
-  assert.equal(events.length, expected.length);
-  expected.forEach((target, index) => {
-    const event = events[index];
-    Object.keys(target).forEach(key => {
-      softEqual(event[key], target[key]);
-    });
-  });
-}
-
-// eslint-disable-next-line no-unused-vars
-async function checkError(promise) {
-  let result;
-  try {
-    result = await promise;
-  } catch (err) {
-    result = err;
-  }
-  // Check the receipt `status` to ensure transaction failed.
-  assert.equal(result.receipt.status, 0x00);
-
-  return result;
-}
+const validateContractState = defaultValidateContractSate({
+  name: "Pioneer Reputation Token",
+  symbol: "PRT",
+  decimals: DECIMALS,
+  totalSupply: TOTAL_SUPPLY_MCOIN,
+  colony: 0
+});
 
 contract("PRT", addresses => {
   let prt;
@@ -98,7 +36,7 @@ contract("PRT", addresses => {
 
       const result = await prt.transfer(otherAccount, transactionAmmount.toString());
 
-      assert.equal(result.receipt.gasUsed, 51063);
+      assert.equal(result.receipt.gasUsed, 51129);
       await validateContractState(prt, {
         balances: [
           {
@@ -126,7 +64,7 @@ contract("PRT", addresses => {
 
       const result = await prt.transfer(otherAccount, transactionAmmount.toString());
 
-      assert.equal(result.receipt.gasUsed, 35935);
+      assert.equal(result.receipt.gasUsed, 36001);
       await validateContractState(prt, {
         balances: [
           {
@@ -238,6 +176,54 @@ contract("PRT", addresses => {
       const destAccount = addresses[2];
       const ammount = 10;
       await checkError(prt.transferFrom(otherAccount, destAccount, ammount));
+    });
+    it("test_registerColony", async () => {
+      const otherAccount = addresses[1];
+
+      const result = await prt.registerColony(otherAccount);
+
+      assert.equal(result.receipt.gasUsed, 71941);
+
+      const colonySupply = TOTAL_SUPPLY_MCOIN.divn(2);
+
+      await validateContractState(prt, {
+        colony: otherAccount,
+        balances: [{ address: web3.eth.coinbase, value: colonySupply }, { address: otherAccount, value: colonySupply }]
+      });
+
+      validateEvents(getEvents(result, "Transfer"), [
+        {
+          event: "Transfer",
+          args: {
+            from: web3.eth.coinbase,
+            to: otherAccount,
+            value: colonySupply
+          }
+        }
+      ]);
+    });
+    it("test_registerColony_only_once", async () => {
+      const otherAccount = addresses[1];
+
+      let result = await prt.registerColony(otherAccount);
+
+      result = await checkError(prt.registerColony(otherAccount));
+      validateEvents(getEvents(result, "Transfer"));
+    });
+    it("test_registerColony_only_owner", async () => {
+      const otherAccount = addresses[1];
+
+      await prt.transferOwnership(otherAccount);
+
+      const result = await checkError(prt.registerColony(otherAccount));
+
+      assert.equal(result.receipt.gasUsed, 23442);
+
+      await validateContractState(prt, {
+        balances: [{ address: web3.eth.coinbase, value: TOTAL_SUPPLY_MCOIN }, { address: otherAccount, value: toBN(0) }]
+      });
+
+      validateEvents(getEvents(result, "Transfer"));
     });
   });
 });

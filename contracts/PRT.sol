@@ -1,10 +1,13 @@
 pragma solidity ^0.4.24;
 
-/// @title General PRT.
-/// @author frods
+import "./Owned.sol";
 
 
-contract PRT {
+/**
+ * @title General PRT.
+ * @dev The token for the pioneer colony and pionercoin
+ */
+contract PRT is Owned {
   string public name = "Pioneer Reputation Token";
   string public symbol = "PRT";
   // 18 decimals is the strongly suggested default, avoid changing it
@@ -13,8 +16,7 @@ contract PRT {
   mapping (address => uint256) private balances;
   mapping (address => mapping (address => uint256)) private allowed;
 
-
-  address private owner;
+  address public colony;
 
   // This generates a public event on the blockchain that will notify clients
   event Transfer(address indexed from, address indexed to, uint256 value);
@@ -29,7 +31,6 @@ contract PRT {
     uint256 initialSupply = 230000;
     totalSupply = initialSupply * 10 ** uint256(decimals); // Update total supply with the decimal amount
     balances[msg.sender] = totalSupply;                     // Give the creator all initial tokens
-    owner = msg.sender;                                     // Store the creator
   }
 
   /// @notice Query balance for an account
@@ -74,5 +75,11 @@ contract PRT {
 
   function allowance(address _owner, address _spender) public view returns (uint256 remaining) {
     return allowed[_owner][_spender];
+  }
+
+  function registerColony(address _colony) public onlyOwner {
+    require(colony == address(0), "Colony already registered");
+    colony = _colony;
+    transfer(_colony, 115000 * 10 ** uint256(decimals));
   }
 }
